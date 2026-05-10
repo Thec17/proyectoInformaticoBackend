@@ -63,7 +63,7 @@ app = FastAPI(title="AWB Backend API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://proyectoinformaticoenriquemolina.netlify.app", 'http://127.0.0.1:5500'],  # Cambiar en producción
+    allow_origins=["https://proyectoinformaticoenriquemolina.netlify.app/"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -519,6 +519,86 @@ async def update_hawb_real(
         "HAWB": hawb_number,
         "real_pcs": pcs,
         "real_wgt": wgt
+    }
+
+
+# =========================================================
+# UPDATE MAWB DATE
+# =========================================================
+
+@app.put("/mawb/{mawb}/date")
+async def update_mawb_date(
+    mawb: str,
+    payload: Dict[str, Any],
+    session: AsyncSession = Depends(get_session)
+):
+    mawb_number = str(mawb).strip()
+    new_date_str = str(payload.get("date", "")).strip()
+
+    if not new_date_str:
+        raise HTTPException(
+            status_code=400,
+            detail="La fecha es obligatoria"
+        )
+
+    # Parsear la fecha
+    new_date = parse_query_date(new_date_str)
+
+    result = await session.execute(
+        select(Mawb).where(
+            Mawb.mawb_number == mawb_number
+        )
+    )
+
+    mawb_obj = result.scalar_one_or_none()
+
+    if mawb_obj is None:
+        raise HTTPException(
+            status_code=404,
+            detail="MAWB no encontrado"
+        )
+
+    mawb_obj.date = new_date
+    await session.commit()
+
+    return {
+        "message": "Fecha actualizada correctamente",
+        "MAWB": mawb_number,
+        "date": format_date_to_colombian(new_date)
+    }
+
+
+# =========================================================
+# DELETE MAWB
+# =========================================================
+
+@app.delete("/mawb/{mawb}")
+async def delete_mawb(
+    mawb: str,
+    session: AsyncSession = Depends(get_session)
+):
+    mawb_number = str(mawb).strip()
+
+    result = await session.execute(
+        select(Mawb).where(
+            Mawb.mawb_number == mawb_number
+        )
+    )
+
+    mawb_obj = result.scalar_one_or_none()
+
+    if mawb_obj is None:
+        raise HTTPException(
+            status_code=404,
+            detail="MAWB no encontrado"
+        )
+
+    await session.delete(mawb_obj)
+    await session.commit()
+
+    return {
+        "message": "MAWB eliminado correctamente",
+        "MAWB": mawb_number
     }
 
 
